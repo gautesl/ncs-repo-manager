@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block title %}
+Home
+{% endblock %}
+{% block content %}
+<h1>GitHub onboarding script interface</h1>
+    {% for message in messages %}
+        <h2>{{ message["title"] }}</h2>
+        <p>{{ message["content"] }}</p>
+    {% endfor %}
+{% endblock %}
