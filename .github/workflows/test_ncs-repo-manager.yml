@@ -60,4 +60,4 @@ jobs:
         with:
           app-name: 'ncs-repo-manager'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1527208E17764C3F9A697554F8F1A059 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_D620B3CDDAFF42338A2FAEDD5199FD86 }}
