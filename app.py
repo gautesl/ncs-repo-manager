@@ -54,7 +54,7 @@ def load_user():
 
 @app.route("/login")
 def login():
-    return github.authorize(scope="repo")
+    return github.authorize(scope="repo,admin:org")
 
 
 @app.route("/github-callback")
