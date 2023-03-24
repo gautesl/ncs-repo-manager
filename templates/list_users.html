@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    <h1>{% block title %} List users {% endblock %}</h1>
+    {% if logged_in %}
+        {% if head and rows %}
+            <table>
+                <thead><tr>
+                    {% for title in head %}
+                        <th>{{title}}</th>
+                    {% endfor %}
+                </tr></thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        {% for entry in row %}
+                            <td>{{entry}}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br/>
+        {% endif %}
+        <form method="post">
+            <label for="usernames">Usernames</label>
+            <br>
+            <textarea name="usernames"
+                    placeholder="Usernames"
+                    rows="15"
+                    cols="60"
+                    >{{ request.form['usernames'] }}</textarea>
+            <br>
+            <button type="submit">Submit</button>
+        </form>
+    {% else %}
+        <p>You must <a href="{{ url_for('login') }}">login</a> to view this page.</p>
+    {% endif %}
+{% endblock %}

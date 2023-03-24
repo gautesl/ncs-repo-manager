@@ -1,2 +1,4 @@
 flask
 GitHub-Flask
+PyGithub
+requests-cache
