@@ -1,4 +1,4 @@
-from github import Github, GithubException
+from github import Github, GithubException, NamedUser
 from typing import Tuple, List, Dict, Union
 import requests_cache
 import argparse
@@ -43,12 +43,7 @@ class RepoManager:
         self._g = Github(access_token)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
 
-    def list_repo_access(self, username) -> List[Tuple[str, Union[bool, str]]]:
-        try:
-            user = self._g.get_user(username)
-        except GithubException:
-            return None
-
+    def _list_user_repo_access(self, user : NamedUser) -> List[Tuple[str, Union[bool, str]]]:
         repos = []
         for repo in self._repos:
             access = repo.has_in_collaborators(user)
@@ -57,8 +52,36 @@ class RepoManager:
             repos.append((repo.name, access))
         return repos
 
+    def list_repo_access(self, username) -> List[Tuple[str, Union[bool, str]]]:
+        try:
+            user = self._g.get_user(username)
+        except GithubException:
+            return None
+
+        return self._list_user_repo_access(user)
+
     def list_users(self, usernames) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
         return {user: self.list_repo_access(user) for user in usernames}
+    
+    def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
+        orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
+        collaborators = set()
+
+        try:
+            for org in orgs:
+                collaborators.update(list(org.get_outside_collaborators()))
+        except GithubException:
+            return None
+ 
+        res = {}
+        for collaborator in collaborators:
+            access_tuple_list = self._list_user_repo_access(collaborator)
+            _, access_list = zip(*access_tuple_list)
+            if any(access_list):
+                res[collaborator.login] = access_tuple_list
+        
+        return res
+
 
     def clear_cache(self):
         requests_cache.clear()
@@ -68,6 +91,7 @@ def cli_help():
     print("\n0: Show this list of commands")
     print("1: List repository access for a user")
     print("2: List repository access for a list of users")
+    print("3: List repository access for all outside collaborators")
     print("9: Clear cached results")
     print("exit: Exit the REPL")
 
@@ -105,6 +129,9 @@ def main(access_token):
                 print("\n" + user)
                 for repo, access in lst[user]:
                     print(f"{'X' if access else ' '} {repo}")
+
+        elif choice == "3":
+            print(manager.list_outside_collaborators())
 
         elif choice == "9":
             manager.clear_cache()

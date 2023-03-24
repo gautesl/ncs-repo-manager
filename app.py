@@ -105,9 +105,9 @@ def about():
     return render_template("insufficient_access.html")
 
 
-@app.route("/list_users/", methods=("GET", "POST"))
-# @app.route("/list_users/<names>", methods=("GET", "POST"))
-def list_users():
+@app.route("/check_users/", methods=("GET", "POST"))
+# @app.route("/check_users/<names>", methods=("GET", "POST"))
+def check_users():
     head = None
     rows = None
 
@@ -119,6 +119,40 @@ def list_users():
             flash("You must be logged in to use this functionality")
         else:
             res = g.user["manager"].list_users(usernames.split())
+
+            random_entry = list(res)[0]
+            head = [""] + [repo_name for repo_name, _ in res[random_entry]]
+
+            rows = []
+            for user, access_list in res.items():
+                if not access_list:
+                    flash(f"Could not find GitHub user '{user}'")
+                    continue
+                row = [user] + [
+                    "✔️" if access == "member" else "✔️🚪" if access else "❌"
+                    for _, access in access_list
+                ]
+                rows.append(row)
+
+    return render_template(
+        "check_users.html", logged_in=g.logged_in, head=head, rows=rows
+    )
+
+@app.route("/list_users/", methods=("GET", "POST"))
+# @app.route("/list_users/<names>", methods=("GET", "POST"))
+def list_users():
+    head = None
+    rows = None
+
+    if request.method == "POST":
+        if not g.logged_in:
+            flash("You must be logged in to use this functionality")
+        else:
+            res = g.user["manager"].list_outside_collaborators()
+
+            if not res:
+                flash("You do not have sufficient permissions to perform this action")
+                return redirect(url_for("home"))
 
             random_entry = list(res)[0]
             head = [""] + [repo_name for repo_name, _ in res[random_entry]]

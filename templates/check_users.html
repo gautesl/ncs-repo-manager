@@ -23,7 +23,15 @@
             <br/>
         {% endif %}
         <form method="post">
-            <button type="submit">List all users</button>
+            <label for="usernames">Usernames</label>
+            <br>
+            <textarea name="usernames"
+                    placeholder="Usernames"
+                    rows="15"
+                    cols="60"
+                    >{{ request.form['usernames'] }}</textarea>
+            <br>
+            <button type="submit">Submit</button>
         </form>
     {% else %}
         <p>You must <a href="{{ url_for('login') }}">login</a> to view this page.</p>
