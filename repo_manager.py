@@ -1,5 +1,5 @@
 from github import Github, GithubException
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 import requests_cache
 import argparse
 import os
@@ -13,7 +13,7 @@ REPOSITORIES = [
     "nrfconnect/sdk-sysctrl",
     "nrfconnect/nrf-regtool",
     "nrfconnect/nrfs",
-    # "NordicSemiconductor/nrfutil-package-index-external-confidential",
+    "NordicSemiconductor/nrfutil-package-index-external-confidential",
     "nrfconnect/sdk-hal_nordic-next",
     "nrfconnect/sdk-nrfxlib-next",
     "nrfconnect/sdk-connectedhomeip-next",
@@ -43,7 +43,7 @@ class RepoManager:
         self._g = Github(access_token)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
 
-    def list_repo_access(self, username) -> List[Tuple[str, bool]]:
+    def list_repo_access(self, username) -> List[Tuple[str, Union[bool, str]]]:
         try:
             user = self._g.get_user(username)
         except GithubException:
@@ -51,10 +51,13 @@ class RepoManager:
 
         repos = []
         for repo in self._repos:
-            repos.append((repo.name, repo.has_in_collaborators(user)))
+            access = repo.has_in_collaborators(user)
+            if access and repo.organization.has_in_members(user):
+                access = "member"
+            repos.append((repo.name, access))
         return repos
 
-    def list_users(self, usernames) -> Dict[str, List[Tuple[str, bool]]]:
+    def list_users(self, usernames) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
         return {user: self.list_repo_access(user) for user in usernames}
 
     def clear_cache(self):

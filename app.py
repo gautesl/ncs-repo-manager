@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, url_for, flash, redirect, g, session
-from datetime import datetime
 from github import GithubException
 from flask_github import GitHub, GitHubError
 from repo_manager import RepoManager, REPOSITORIES
@@ -24,6 +23,33 @@ def load_user():
         if id in users:
             g.user = users[id]
             g.logged_in = bool("manager" in g.user)
+
+
+# @app.route("/login")
+# def login():
+#     next_url = url_for("home")
+#     oauth_token = os.environ["ACCESS_TOKEN"]
+#     try:
+#         github_user = github.get("/user", access_token=oauth_token)
+#     except GitHubError:
+#         flash("Insufficient access.")
+#         next_url = url_for("insufficient_access")
+#         return redirect(next_url)
+
+#     id = github_user["id"]
+#     users[id] = {}
+#     users[id]["login"] = github_user["login"]
+#     users[id]["access_token"] = oauth_token
+
+#     session["user_id"] = id
+
+#     try:
+#         manager = RepoManager(oauth_token)
+#         users[id]["manager"] = manager
+#     except GithubException:
+#         next_url = url_for("insufficient_access")
+
+#     return redirect(next_url)
 
 
 @app.route("/login")
@@ -69,12 +95,6 @@ def token_getter():
         return user["access_token"]
 
 
-@app.route("/repo")
-def repo():
-    repo_dict = github.get("repos/cenkalti/github-flask")
-    return str(repo_dict)
-
-
 @app.route("/")
 def home():
     return render_template("home.html", logged_in=g.logged_in, repos=REPOSITORIES)
@@ -83,11 +103,6 @@ def home():
 @app.route("/insufficient_access/")
 def about():
     return render_template("insufficient_access.html")
-
-
-@app.route("/contact/")
-def contact():
-    return render_template("contact.html")
 
 
 @app.route("/list_users/", methods=("GET", "POST"))
@@ -113,10 +128,15 @@ def list_users():
                 if not access_list:
                     flash(f"Could not find GitHub user '{user}'")
                     continue
-                row = [user] + ["✔️" if access else "❌" for _, access in access_list]
+                row = [user] + [
+                    "✔️" if access == "member" else "✔️🚪" if access else "❌"
+                    for _, access in access_list
+                ]
                 rows.append(row)
 
-    return render_template("list_users.html", logged_in=g.logged_in, head=head, rows=rows)
+    return render_template(
+        "list_users.html", logged_in=g.logged_in, head=head, rows=rows
+    )
 
 
 # @app.route("/create/", methods=("GET", "POST"))
