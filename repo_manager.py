@@ -1,4 +1,5 @@
-from github import Github, GithubException, NamedUser
+from github import Github, GithubException
+from github.NamedUser import NamedUser
 from typing import Tuple, List, Dict, Union
 import requests_cache
 import argparse
@@ -64,22 +65,30 @@ class RepoManager:
         return {user: self.list_repo_access(user) for user in usernames}
     
     def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
+        print("Getting organizations")
         orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
         collaborators = set()
 
+        print("Getting outside collaborators")
         try:
             for org in orgs:
                 collaborators.update(list(org.get_outside_collaborators()))
-        except GithubException:
+        except GithubException as e:
+            print("Exception received:")
+            print(e)
             return None
  
+        print("Constructing return list")
         res = {}
         for collaborator in collaborators:
+            print("Checking user", collaborator.login)
             access_tuple_list = self._list_user_repo_access(collaborator)
             _, access_list = zip(*access_tuple_list)
             if any(access_list):
+                print("User has at least access to one repository")
                 res[collaborator.login] = access_tuple_list
         
+        print("Finished list_outside_collaborators() successfully")
         return res
 
 

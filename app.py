@@ -79,9 +79,11 @@ def authorized(oauth_token):
 
     session["user_id"] = id
 
+    print("Authenticated user with id", id, "login", github_user["login"])
     try:
         manager = RepoManager(oauth_token)
         users[id]["manager"] = manager
+        print("Created an associated repo manager")
     except GithubException:
         next_url = url_for("insufficient_access")
 
@@ -144,16 +146,22 @@ def list_users():
     head = None
     rows = None
 
+    print("Request for 'list_users':")
+    print("\tlogged in:", g.logged_in)
     if request.method == "POST":
         if not g.logged_in:
             flash("You must be logged in to use this functionality")
         else:
+            print("\tCalling list_outside_collaborators()")
             res = g.user["manager"].list_outside_collaborators()
+            print("\tCall finished, res =", res)
 
             if not res:
+                print("\tNo res, redirecting")
                 flash("You do not have sufficient permissions to perform this action")
                 return redirect(url_for("home"))
 
+            print("\tCreating table")
             random_entry = list(res)[0]
             head = [""] + [repo_name for repo_name, _ in res[random_entry]]
 
