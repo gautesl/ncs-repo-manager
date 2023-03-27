@@ -4,6 +4,11 @@
     <h1>{% block title %} List users {% endblock %}</h1>
     {% if logged_in %}
         {% if head and rows %}
+            <ul>
+                <li>✔️ = Organization access</li>
+                <li>✔️🚪 = Outside collaborator access</li>
+                <li>❌ = No access</li>
+            </ul>
             <table>
                 <thead><tr>
                     {% for title in head %}

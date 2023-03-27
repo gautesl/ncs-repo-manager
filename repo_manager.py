@@ -14,10 +14,10 @@ REPOSITORIES = [
     "nrfconnect/sdk-sysctrl",
     "nrfconnect/nrf-regtool",
     "nrfconnect/nrfs",
-    "NordicSemiconductor/nrfutil-package-index-external-confidential",
     "nrfconnect/sdk-hal_nordic-next",
     "nrfconnect/sdk-nrfxlib-next",
     "nrfconnect/sdk-connectedhomeip-next",
+    "NordicSemiconductor/nrfutil-package-index-external-confidential",
 ]
 
 
@@ -32,10 +32,10 @@ class RepoManager:
     - https://github.com/nrfconnect/sdk-sysctrl
     - https://github.com/nrfconnect/nrf-regtool
     - https://github.com/nrfconnect/nrfs
-    - https://github.com/NordicSemiconductor/nrfutil-package-index-external-confidential
     - https://github.com/nrfconnect/sdk-hal_nordic-next
     - https://github.com/nrfconnect/sdk-nrfxlib-next
     - https://github.com/nrfconnect/sdk-connectedhomeip-next
+    - https://github.com/NordicSemiconductor/nrfutil-package-index-external-confidential
     """
 
     def __init__(self, access_token):
@@ -43,13 +43,18 @@ class RepoManager:
 
         self._g = Github(access_token)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
+        # self._orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
+        # self._outside_collaborators = set()
+        # for org in self._orgs:
+        #     self._outside_collaborators.update(list(org.get_outside_collaborators()))
+        # print(len(self._outside_collaborators))
 
     def _list_user_repo_access(self, user : NamedUser) -> List[Tuple[str, Union[bool, str]]]:
         repos = []
         for repo in self._repos:
             access = repo.has_in_collaborators(user)
-            if access and repo.organization.has_in_members(user):
-                access = "member"
+            if user in repo.get_collaborators(affiliation="outside"):
+                access = "outside"
             repos.append((repo.name, access))
         return repos
 
@@ -95,12 +100,16 @@ class RepoManager:
     def clear_cache(self):
         requests_cache.clear()
 
+    def test(self):
+        pass
+
 
 def cli_help():
     print("\n0: Show this list of commands")
     print("1: List repository access for a user")
     print("2: List repository access for a list of users")
     print("3: List repository access for all outside collaborators")
+    print("8: Test")
     print("9: Clear cached results")
     print("exit: Exit the REPL")
 
@@ -129,7 +138,12 @@ def main(access_token):
                 continue
 
             for repo, access in repos:
-                print(f"{'X' if access else ' '} {repo}")
+                prefix = "No access       "
+                if access == "outside":
+                    prefix = "Outside col     "
+                elif access:
+                    prefix = "Org access      "
+                print(f"{prefix} {repo}")
 
         elif choice == "2":
             users = input("Space separated list of login names\n> ").split()
@@ -141,6 +155,9 @@ def main(access_token):
 
         elif choice == "3":
             print(manager.list_outside_collaborators())
+
+        elif choice == "8":
+            manager.test()
 
         elif choice == "9":
             manager.clear_cache()

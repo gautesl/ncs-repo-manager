@@ -131,7 +131,7 @@ def check_users():
                     flash(f"Could not find GitHub user '{user}'")
                     continue
                 row = [user] + [
-                    "✔️" if access == "member" else "✔️🚪" if access else "❌"
+                    "✔️🚪" if access == "outside" else "✔️" if access else "❌"
                     for _, access in access_list
                 ]
                 rows.append(row)
@@ -152,47 +152,33 @@ def list_users():
         if not g.logged_in:
             flash("You must be logged in to use this functionality")
         else:
-            print("\tCalling list_outside_collaborators()")
-            res = g.user["manager"].list_outside_collaborators()
-            print("\tCall finished, res =", res)
+            flash("This functionality has been temporarily disabled")
 
-            if not res:
-                print("\tNo res, redirecting")
-                flash("You do not have sufficient permissions to perform this action")
-                return redirect(url_for("home"))
 
-            print("\tCreating table")
-            random_entry = list(res)[0]
-            head = [""] + [repo_name for repo_name, _ in res[random_entry]]
+            # print("\tCalling list_outside_collaborators()")
+            # res = g.user["manager"].list_outside_collaborators()
+            # print("\tCall finished, res =", res)
 
-            rows = []
-            for user, access_list in res.items():
-                if not access_list:
-                    flash(f"Could not find GitHub user '{user}'")
-                    continue
-                row = [user] + [
-                    "✔️" if access == "member" else "✔️🚪" if access else "❌"
-                    for _, access in access_list
-                ]
-                rows.append(row)
+            # if not res:
+            #     print("\tNo res, redirecting")
+            #     flash("You do not have sufficient permissions to perform this action")
+            #     return redirect(url_for("home"))
+
+            # print("\tCreating table")
+            # random_entry = list(res)[0]
+            # head = [""] + [repo_name for repo_name, _ in res[random_entry]]
+
+            # rows = []
+            # for user, access_list in res.items():
+            #     if not access_list:
+            #         flash(f"Could not find GitHub user '{user}'")
+            #         continue
+            #     row = [user] + [
+            #         "✔️" if access == "member" else "✔️🚪" if access else "❌"
+            #         for _, access in access_list
+            #     ]
+            #     rows.append(row)
 
     return render_template(
         "list_users.html", logged_in=g.logged_in, head=head, rows=rows
     )
-
-
-# @app.route("/create/", methods=("GET", "POST"))
-# def create():
-#     if request.method == "POST":
-#         title = request.form["title"]
-#         content = request.form["content"]
-
-#         if not title:
-#             flash("Title is required!")
-#         elif not content:
-#             flash("Content is required!")
-#         else:
-#             messages.append({"title": title, "content": content})
-#             return redirect(url_for("home"))
-
-#     return render_template("create.html")
