@@ -43,11 +43,6 @@ class RepoManager:
 
         self._g = Github(access_token)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
-        # self._orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
-        # self._outside_collaborators = set()
-        # for org in self._orgs:
-        #     self._outside_collaborators.update(list(org.get_outside_collaborators()))
-        # print(len(self._outside_collaborators))
 
     def _list_user_repo_access(self, user : NamedUser) -> List[Tuple[str, Union[bool, str]]]:
         repos = []
@@ -55,10 +50,12 @@ class RepoManager:
             access = repo.has_in_collaborators(user)
             if user in repo.get_collaborators(affiliation="outside"):
                 access = "outside"
+            elif not access and user in [invite.invitee for invite in repo.get_pending_invitations()]:
+                access = "pending"
             repos.append((repo.name, access))
         return repos
 
-    def list_repo_access(self, username) -> List[Tuple[str, Union[bool, str]]]:
+    def list_repo_access(self, username : str) -> List[Tuple[str, Union[bool, str]]]:
         try:
             user = self._g.get_user(username)
         except GithubException:
@@ -66,35 +63,59 @@ class RepoManager:
 
         return self._list_user_repo_access(user)
 
-    def list_users(self, usernames) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
+    def list_users(self, usernames : str) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
         return {user: self.list_repo_access(user) for user in usernames}
     
-    def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
-        print("Getting organizations")
-        orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
-        collaborators = set()
-
-        print("Getting outside collaborators")
+    def add_user(self, username : str) -> Tuple[bool, str]:
         try:
-            for org in orgs:
-                collaborators.update(list(org.get_outside_collaborators()))
-        except GithubException as e:
-            print("Exception received:")
-            print(e)
-            return None
- 
-        print("Constructing return list")
-        res = {}
-        for collaborator in collaborators:
-            print("Checking user", collaborator.login)
-            access_tuple_list = self._list_user_repo_access(collaborator)
-            _, access_list = zip(*access_tuple_list)
-            if any(access_list):
-                print("User has at least access to one repository")
-                res[collaborator.login] = access_tuple_list
+            user = self._g.get_user(username)
+        except GithubException:
+            return False, "Username not found"
+
+        access_list = self._list_user_repo_access(user)
+        for repo_name, access in access_list:
+            if access is True:
+                return False, f"User is already an organization member of {repo_name}"
         
-        print("Finished list_outside_collaborators() successfully")
-        return res
+        try:
+            for repo in self._repos:
+                repo.add_to_collaborators(user)
+        except GithubException as e:
+            if "message" in e:
+                return True, e["message"]
+            return True, f"Something went wrong while adding to collaborators for {repo.name}"
+
+        return True, ""
+
+    def add_users(self, usernames : str) -> Dict[str, Tuple[bool, str]]:
+        return {username: self.add_user(username) for username in usernames}
+
+    # def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
+    #     print("Getting organizations")
+    #     orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
+    #     collaborators = set()
+
+    #     print("Getting outside collaborators")
+    #     try:
+    #         for org in orgs:
+    #             collaborators.update(list(org.get_outside_collaborators()))
+    #     except GithubException as e:
+    #         print("Exception received:")
+    #         print(e)
+    #         return None
+ 
+    #     print("Constructing return list")
+    #     res = {}
+    #     for collaborator in collaborators:
+    #         print("Checking user", collaborator.login)
+    #         access_tuple_list = self._list_user_repo_access(collaborator)
+    #         _, access_list = zip(*access_tuple_list)
+    #         if any(access_list):
+    #             print("User has at least access to one repository")
+    #             res[collaborator.login] = access_tuple_list
+        
+    #     print("Finished list_outside_collaborators() successfully")
+    #     return res
 
 
     def clear_cache(self):
@@ -141,7 +162,9 @@ def main(access_token):
                 prefix = "No access       "
                 if access == "outside":
                     prefix = "Outside col     "
-                elif access:
+                elif access == "pending":
+                    prefix = "Invite pending  "
+                elif access is True:
                     prefix = "Org access      "
                 print(f"{prefix} {repo}")
 

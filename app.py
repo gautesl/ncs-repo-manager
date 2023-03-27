@@ -123,7 +123,8 @@ def check_users():
             res = g.user["manager"].list_users(usernames.split())
 
             random_entry = list(res)[0]
-            head = [""] + [repo_name for repo_name, _ in res[random_entry]]
+            if res[random_entry]:
+                head = [""] + [repo_name for repo_name, _ in res[random_entry]]
 
             rows = []
             for user, access_list in res.items():
@@ -131,7 +132,7 @@ def check_users():
                     flash(f"Could not find GitHub user '{user}'")
                     continue
                 row = [user] + [
-                    "✔️🚪" if access == "outside" else "✔️" if access else "❌"
+                    "✔️🚪" if access == "outside" else "❌📧" if access == "pending" else "✔️" if access else "❌"
                     for _, access in access_list
                 ]
                 rows.append(row)
@@ -139,6 +140,29 @@ def check_users():
     return render_template(
         "check_users.html", logged_in=g.logged_in, head=head, rows=rows
     )
+
+@app.route("/add_users/", methods=("GET", "POST"))
+def add_users():
+    if request.method == "POST":
+        usernames = request.form["usernames"]
+        if not usernames:
+            flash("At least one username is required")
+        elif not g.logged_in:
+            flash("You must be logged in to use this functionality")
+        else:
+            res = g.user["manager"].add_users(usernames.split())
+            for username, (success, message) in res.items():
+                if success and message:
+                    flash(f"Partial success for {username}: {message}")
+                elif message:
+                    flash(f"Failed to add {username}: {message}")
+                elif success:
+                    flash(f"Added user {username}", category="success")
+            g.user["manager"].clear_cache()
+            
+            return redirect(url_for("check_users"))
+
+    return render_template("add_users.html", logged_in=g.logged_in)
 
 @app.route("/list_users/", methods=("GET", "POST"))
 # @app.route("/list_users/<names>", methods=("GET", "POST"))

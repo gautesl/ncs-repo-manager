@@ -26,11 +26,18 @@
     font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.alert {
+.message {
     padding: 20px;
     margin: 5px;
     color: #970020;
     background-color: #ffd5de;
+}
+
+.success {
+    padding: 20px;
+    margin: 5px;
+    color: #088d19;
+    background-color: #c9e6d6;
 }
 
 th, td {

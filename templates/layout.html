@@ -12,11 +12,12 @@
             <a href="{{ url_for('login') }}" class="navbar-item">Login</a>
             <a href="{{ url_for('check_users') }}" class="navbar-item">Check users</a>
             <a href="{{ url_for('list_users') }}" class="navbar-item">List users</a>
+            <a href="{{ url_for('add_users') }}" class="navbar-item">Add users</a>
         </div>
 
         <div class="body-content">
-            {% for message in get_flashed_messages() %}
-                <div class="alert">{{ message }}</div>
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+                <div class="{{ category }}">{{ message }}</div>
             {% endfor %}
             {% block content %}
             {% endblock %}
