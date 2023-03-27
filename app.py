@@ -120,6 +120,7 @@ def check_users():
         elif not g.logged_in:
             flash("You must be logged in to use this functionality")
         else:
+            g.user["manager"].clear_cache()
             res = g.user["manager"].list_users(usernames.split())
 
             random_entry = list(res)[0]

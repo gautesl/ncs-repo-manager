@@ -79,7 +79,7 @@ class RepoManager:
         
         try:
             for repo in self._repos:
-                repo.add_to_collaborators(user)
+                repo.add_to_collaborators(user, permission="pull")
         except GithubException as e:
             if "message" in e:
                 return True, e["message"]
@@ -89,6 +89,28 @@ class RepoManager:
 
     def add_users(self, usernames : str) -> Dict[str, Tuple[bool, str]]:
         return {username: self.add_user(username) for username in usernames}
+
+    # def list_outside_collaborators(self):
+    #     all_outside_collaborators = []
+    #     all_repos = {}
+    #     for repo in self._repos:
+    #         all_repos[repo.name] = {
+    #             "all_collaborators": repo.get_collaborators(),
+    #             "outside_collaborators": repo.get_collaborators(affiliation="outside"),
+    #             "pending_invites": [inv.invitee for inv in repo.get_pending_invitations()],
+    #         }
+    #         all_outside_collaborators += list()
+
+
+    #     cols = {}
+    #     for repo_name, repo_map in all_repos.items():
+    #         for outside_collaborator in repo_map["outside_collaborators"]:
+    #             if not outside_collaborator in cols:
+    #                 cols[outside_collaborator] = {repo.name: False for repo in self._repos}
+    #             cols[outside_collaborator][repo_name] = "outside"
+
+
+
 
     # def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
     #     print("Getting organizations")
