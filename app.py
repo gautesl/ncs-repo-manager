@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, url_for, flash, redirect, g, session
 from github import GithubException
 from flask_github import GitHub, GitHubError
-from typing import Tuple, List
-from repo_manager import RepoManager, REPOSITORIES
+from typing import Tuple, List, Dict
+from repo_manager import RepoManager, REPOSITORIES, Access
 import os
 
 app = Flask(__name__)
@@ -15,17 +15,16 @@ github = GitHub(app)
 users = {}
 
 # Utilify functions
-def create_table(mapping : dict) -> Tuple[List[str], List[List[str]]]:
-    head = [""] + [repo.split("/")[1] for repo in REPOSITORIES]
+def create_table(mapping : Dict[str, Dict[str, Access]]) -> Tuple[List[str], List[List[str]]]:
+    repos = [repo.split("/")[1] for repo in REPOSITORIES]
+    head = [""] + repos
     rows = []
-    for user, access_list in mapping.items():
-        if not access_list:
+
+    for user, access_map in mapping.items():
+        if not access_map:
             flash(f"Could not find GitHub user '{user}'")
             continue
-        row = [user] + [
-            "✔️🚪" if access == "outside" else "❌📧" if access == "pending" else "✔️" if access else "❌"
-            for _, access in access_list
-        ]
+        row = [user] + [str(access_map[repo]) for repo in repos]
         rows.append(row)
     return head, rows
 
@@ -42,36 +41,36 @@ def load_user():
             g.logged_in = bool("manager" in g.user)
 
 
-# @app.route("/login")
-# def login():
-#     next_url = url_for("home")
-#     oauth_token = os.environ["ACCESS_TOKEN"]
-#     try:
-#         github_user = github.get("/user", access_token=oauth_token)
-#     except GitHubError:
-#         flash("Insufficient access.")
-#         next_url = url_for("insufficient_access")
-#         return redirect(next_url)
-
-#     id = github_user["id"]
-#     users[id] = {}
-#     users[id]["login"] = github_user["login"]
-#     users[id]["access_token"] = oauth_token
-
-#     session["user_id"] = id
-
-#     try:
-#         manager = RepoManager(oauth_token, id)
-#         users[id]["manager"] = manager
-#     except GithubException:
-#         next_url = url_for("insufficient_access")
-
-#     return redirect(next_url)
-
-
 @app.route("/login")
 def login():
-    return github.authorize(scope="repo,admin:org")
+    next_url = url_for("home")
+    oauth_token = os.environ["ACCESS_TOKEN"]
+    try:
+        github_user = github.get("/user", access_token=oauth_token)
+    except GitHubError:
+        flash("Insufficient access.")
+        next_url = url_for("insufficient_access")
+        return redirect(next_url)
+
+    id = github_user["id"]
+    users[id] = {}
+    users[id]["login"] = github_user["login"]
+    users[id]["access_token"] = oauth_token
+
+    session["user_id"] = id
+
+    try:
+        manager = RepoManager(oauth_token, id)
+        users[id]["manager"] = manager
+    except GithubException:
+        next_url = url_for("insufficient_access")
+
+    return redirect(next_url)
+
+
+# @app.route("/login")
+# def login():
+#     return github.authorize(scope="repo,admin:org")
 
 
 @app.route("/github-callback")
