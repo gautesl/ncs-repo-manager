@@ -1,5 +1,6 @@
 from github import Github, GithubException
 from github.NamedUser import NamedUser
+from github.PaginatedList import PaginatedList
 from typing import Tuple, List, Dict, Union
 from enum import Enum
 import requests_cache
@@ -20,6 +21,8 @@ REPOSITORIES = [
     "nrfconnect/sdk-connectedhomeip-next",
     "NordicSemiconductor/nrfutil-package-index-external-confidential",
 ]
+
+LIST_USER_CACHE_THRESHOLD = 3
 
 class Access(Enum):
     MEMBER = "✔️"
@@ -51,13 +54,21 @@ class RepoManager:
     def __init__(self, access_token, id="common"):
         requests_cache.install_cache(f"github_cache_{id}")
 
-        self._g = Github(access_token)
+        self._g = Github(access_token, per_page=100)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
 
-    def _list_user_repo_access(self, user : NamedUser) -> Dict[str, Access]:
+    def _list_user_repo_access(self, user : NamedUser, collaborators : Dict[str, PaginatedList]) -> Dict[str, Access]:
+        """
+        API calls: 2 * repos + pagination
+        """
+
         repos = {}
         for repo in self._repos:
-            access = repo.has_in_collaborators(user)
+            if collaborators:
+                access = user in collaborators[repo.name]
+            else:
+                access = repo.has_in_collaborators(user)
+
             if access:
                 repos[repo.name] = Access.MEMBER
             else:
@@ -69,18 +80,35 @@ class RepoManager:
                 repos[repo.name] = Access.PENDING
         return repos
 
-    def list_repo_access(self, username : str) -> Dict[str, Access]:
+    def list_repo_access(self, username : str, collaborators : Dict[str, PaginatedList] = None) -> Dict[str, Access]:
+        """
+        API calls: 2 * repos + pagination
+        """
+
         try:
             user = self._g.get_user(username)
         except GithubException:
             return None
 
-        return self._list_user_repo_access(user)
+        return self._list_user_repo_access(user, collaborators)
 
-    def list_users(self, usernames : str) -> Dict[str, Dict[str, Access]]:
-        return {user: self.list_repo_access(user) for user in usernames}
+    def list_users(self, usernames : List[str]) -> Dict[str, Dict[str, Access]]:
+        """
+        API calls: (2 * repos + pagination) * users
+        """
+
+        collaborators = {}
+        if len(usernames) >= LIST_USER_CACHE_THRESHOLD:
+            for repo in self._repos:
+                collaborators[repo.name] = repo.get_collaborators()
+
+        return {user: self.list_repo_access(user, collaborators) for user in usernames}
     
     def add_user(self, username : str) -> Tuple[bool, str]:
+        """
+        API calls: (2 * repos + pagination) + repos
+        """
+
         try:
             user = self._g.get_user(username)
         except GithubException:
@@ -102,11 +130,15 @@ class RepoManager:
         return True, ""
 
     def add_users(self, usernames : str) -> Dict[str, Tuple[bool, str]]:
+        """
+        API calls: ((2 * repos + pagination) + repos) * users
+        """
+
         return {username: self.add_user(username) for username in usernames}
 
     def list_outside_collaborators(self) -> Dict[str, Dict[str, Access]]:
         """
-        API calls: 3 * repo
+        API calls: 3 * repo + pagination
         """
         all_outside_collaborators = []
         all_repos = {}

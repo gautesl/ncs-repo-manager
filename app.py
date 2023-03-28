@@ -41,36 +41,36 @@ def load_user():
             g.logged_in = bool("manager" in g.user)
 
 
-@app.route("/login")
-def login():
-    next_url = url_for("home")
-    oauth_token = os.environ["ACCESS_TOKEN"]
-    try:
-        github_user = github.get("/user", access_token=oauth_token)
-    except GitHubError:
-        flash("Insufficient access.")
-        next_url = url_for("insufficient_access")
-        return redirect(next_url)
-
-    id = github_user["id"]
-    users[id] = {}
-    users[id]["login"] = github_user["login"]
-    users[id]["access_token"] = oauth_token
-
-    session["user_id"] = id
-
-    try:
-        manager = RepoManager(oauth_token, id)
-        users[id]["manager"] = manager
-    except GithubException:
-        next_url = url_for("insufficient_access")
-
-    return redirect(next_url)
-
-
 # @app.route("/login")
 # def login():
-#     return github.authorize(scope="repo,admin:org")
+#     next_url = url_for("home")
+#     oauth_token = os.environ["ACCESS_TOKEN"]
+#     try:
+#         github_user = github.get("/user", access_token=oauth_token)
+#     except GitHubError:
+#         flash("Insufficient access.")
+#         next_url = url_for("insufficient_access")
+#         return redirect(next_url)
+
+#     id = github_user["id"]
+#     users[id] = {}
+#     users[id]["login"] = github_user["login"]
+#     users[id]["access_token"] = oauth_token
+
+#     session["user_id"] = id
+
+#     try:
+#         manager = RepoManager(oauth_token, id)
+#         users[id]["manager"] = manager
+#     except GithubException:
+#         next_url = url_for("insufficient_access")
+
+#     return redirect(next_url)
+
+
+@app.route("/login")
+def login():
+    return github.authorize(scope="repo,admin:org")
 
 
 @app.route("/github-callback")
