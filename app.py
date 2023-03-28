@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, url_for, flash, redirect, g, session
 from github import GithubException
 from flask_github import GitHub, GitHubError
+from typing import Tuple, List
 from repo_manager import RepoManager, REPOSITORIES
 import os
 
@@ -13,6 +14,22 @@ github = GitHub(app)
 
 users = {}
 
+# Utilify functions
+def create_table(mapping : dict) -> Tuple[List[str], List[List[str]]]:
+    head = [""] + [repo.split("/")[1] for repo in REPOSITORIES]
+    rows = []
+    for user, access_list in mapping.items():
+        if not access_list:
+            flash(f"Could not find GitHub user '{user}'")
+            continue
+        row = [user] + [
+            "✔️🚪" if access == "outside" else "❌📧" if access == "pending" else "✔️" if access else "❌"
+            for _, access in access_list
+        ]
+        rows.append(row)
+    return head, rows
+
+# Flask functions
 
 @app.before_request
 def load_user():
@@ -44,7 +61,7 @@ def load_user():
 #     session["user_id"] = id
 
 #     try:
-#         manager = RepoManager(oauth_token)
+#         manager = RepoManager(oauth_token, id)
 #         users[id]["manager"] = manager
 #     except GithubException:
 #         next_url = url_for("insufficient_access")
@@ -81,7 +98,7 @@ def authorized(oauth_token):
 
     print("Authenticated user with id", id, "login", github_user["login"])
     try:
-        manager = RepoManager(oauth_token)
+        manager = RepoManager(oauth_token, id)
         users[id]["manager"] = manager
         print("Created an associated repo manager")
     except GithubException:
@@ -108,7 +125,6 @@ def about():
 
 
 @app.route("/check_users/", methods=("GET", "POST"))
-# @app.route("/check_users/<names>", methods=("GET", "POST"))
 def check_users():
     head = None
     rows = None
@@ -122,21 +138,7 @@ def check_users():
         else:
             g.user["manager"].clear_cache()
             res = g.user["manager"].list_users(usernames.split())
-
-            random_entry = list(res)[0]
-            if res[random_entry]:
-                head = [""] + [repo_name for repo_name, _ in res[random_entry]]
-
-            rows = []
-            for user, access_list in res.items():
-                if not access_list:
-                    flash(f"Could not find GitHub user '{user}'")
-                    continue
-                row = [user] + [
-                    "✔️🚪" if access == "outside" else "❌📧" if access == "pending" else "✔️" if access else "❌"
-                    for _, access in access_list
-                ]
-                rows.append(row)
+            head, rows = create_table(res)
 
     return render_template(
         "check_users.html", logged_in=g.logged_in, head=head, rows=rows
@@ -166,7 +168,6 @@ def add_users():
     return render_template("add_users.html", logged_in=g.logged_in)
 
 @app.route("/list_users/", methods=("GET", "POST"))
-# @app.route("/list_users/<names>", methods=("GET", "POST"))
 def list_users():
     head = None
     rows = None
@@ -177,32 +178,9 @@ def list_users():
         if not g.logged_in:
             flash("You must be logged in to use this functionality")
         else:
-            flash("This functionality has been temporarily disabled")
-
-
-            # print("\tCalling list_outside_collaborators()")
-            # res = g.user["manager"].list_outside_collaborators()
-            # print("\tCall finished, res =", res)
-
-            # if not res:
-            #     print("\tNo res, redirecting")
-            #     flash("You do not have sufficient permissions to perform this action")
-            #     return redirect(url_for("home"))
-
-            # print("\tCreating table")
-            # random_entry = list(res)[0]
-            # head = [""] + [repo_name for repo_name, _ in res[random_entry]]
-
-            # rows = []
-            # for user, access_list in res.items():
-            #     if not access_list:
-            #         flash(f"Could not find GitHub user '{user}'")
-            #         continue
-            #     row = [user] + [
-            #         "✔️" if access == "member" else "✔️🚪" if access else "❌"
-            #         for _, access in access_list
-            #     ]
-            #     rows.append(row)
+            g.user["manager"].clear_cache()
+            res = g.user["manager"].list_outside_collaborators()
+            head, rows = create_table(res)
 
     return render_template(
         "list_users.html", logged_in=g.logged_in, head=head, rows=rows

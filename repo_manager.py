@@ -38,8 +38,8 @@ class RepoManager:
     - https://github.com/NordicSemiconductor/nrfutil-package-index-external-confidential
     """
 
-    def __init__(self, access_token):
-        requests_cache.install_cache("github_cache")
+    def __init__(self, access_token, id="common"):
+        requests_cache.install_cache(f"github_cache_{id}")
 
         self._g = Github(access_token)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
@@ -90,61 +90,42 @@ class RepoManager:
     def add_users(self, usernames : str) -> Dict[str, Tuple[bool, str]]:
         return {username: self.add_user(username) for username in usernames}
 
-    # def list_outside_collaborators(self):
-    #     all_outside_collaborators = []
-    #     all_repos = {}
-    #     for repo in self._repos:
-    #         all_repos[repo.name] = {
-    #             "all_collaborators": repo.get_collaborators(),
-    #             "outside_collaborators": repo.get_collaborators(affiliation="outside"),
-    #             "pending_invites": [inv.invitee for inv in repo.get_pending_invitations()],
-    #         }
-    #         all_outside_collaborators += list()
+    def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
+        """
+        API calls: 3 * repo
+        """
+        all_outside_collaborators = []
+        all_repos = {}
+        for repo in self._repos:
+            all_repos[repo.name] = {
+                "all_collaborators": repo.get_collaborators(),
+                "outside_collaborators": repo.get_collaborators(affiliation="outside"),
+                "pending_invites": [inv.invitee for inv in repo.get_pending_invitations()],
+            }
+            all_outside_collaborators += all_repos[repo.name]["outside_collaborators"]
 
 
-    #     cols = {}
-    #     for repo_name, repo_map in all_repos.items():
-    #         for outside_collaborator in repo_map["outside_collaborators"]:
-    #             if not outside_collaborator in cols:
-    #                 cols[outside_collaborator] = {repo.name: False for repo in self._repos}
-    #             cols[outside_collaborator][repo_name] = "outside"
-
-
-
-
-    # def list_outside_collaborators(self) -> Dict[str, List[Tuple[str, Union[bool, str]]]]:
-    #     print("Getting organizations")
-    #     orgs = [self._g.get_organization("nrfconnect"), self._g.get_organization("NordicSemiconductor")]
-    #     collaborators = set()
-
-    #     print("Getting outside collaborators")
-    #     try:
-    #         for org in orgs:
-    #             collaborators.update(list(org.get_outside_collaborators()))
-    #     except GithubException as e:
-    #         print("Exception received:")
-    #         print(e)
-    #         return None
- 
-    #     print("Constructing return list")
-    #     res = {}
-    #     for collaborator in collaborators:
-    #         print("Checking user", collaborator.login)
-    #         access_tuple_list = self._list_user_repo_access(collaborator)
-    #         _, access_list = zip(*access_tuple_list)
-    #         if any(access_list):
-    #             print("User has at least access to one repository")
-    #             res[collaborator.login] = access_tuple_list
+        cols = {}
+        for collaborator in all_outside_collaborators:
+            access_map = {repo.name: False for repo in self._repos}
+            cols[collaborator.login] = access_map
+            for repo_name, repo_map in all_repos.items():
+                if collaborator in repo_map["outside_collaborators"]:
+                    access_map[repo_name] = "outside"
+                elif collaborator in repo_map["all_collaborators"]:
+                    access_map[repo_name] = True
+                elif collaborator in repo_map["pending_invites"]:
+                    access_map[repo_name] = "pending"
         
-    #     print("Finished list_outside_collaborators() successfully")
-    #     return res
-
+        # Returning each collaborator mapped to a list sorted in repository order
+        return {col: [(repo.name, m[repo.name]) for repo in self._repos] for col, m in cols.items()}
 
     def clear_cache(self):
         requests_cache.clear()
 
     def test(self):
-        pass
+        res = self._g.get_repo("nrfconnect/sdk-nrf-next").get_collaborators(affiliation="outside")
+        print([user.login for user in res])
 
 
 def cli_help():
@@ -155,6 +136,17 @@ def cli_help():
     print("8: Test")
     print("9: Clear cached results")
     print("exit: Exit the REPL")
+
+def print_repo_access(repos : List[Tuple[str, Union[str, bool]]]):
+    for repo, access in repos:
+        prefix = "No access       "
+        if access == "outside":
+            prefix = "Outside col     "
+        elif access == "pending":
+            prefix = "Invite pending  "
+        elif access is True:
+            prefix = "Org access      "
+        print(f"{prefix} {repo}")
 
 
 def main(access_token):
@@ -178,28 +170,21 @@ def main(access_token):
             repos = manager.list_repo_access(name)
             if repos is None:
                 print("Could not fetch data for the requested user")
-                continue
-
-            for repo, access in repos:
-                prefix = "No access       "
-                if access == "outside":
-                    prefix = "Outside col     "
-                elif access == "pending":
-                    prefix = "Invite pending  "
-                elif access is True:
-                    prefix = "Org access      "
-                print(f"{prefix} {repo}")
+            else:
+                print_repo_access(repos)
 
         elif choice == "2":
             users = input("Space separated list of login names\n> ").split()
             lst = manager.list_users(users)
             for user in lst:
                 print("\n" + user)
-                for repo, access in lst[user]:
-                    print(f"{'X' if access else ' '} {repo}")
+                print_repo_access(lst[user])
 
         elif choice == "3":
-            print(manager.list_outside_collaborators())
+            lst = manager.list_outside_collaborators()
+            for user in lst:
+                print("\n" + user)
+                print_repo_access(lst[user])
 
         elif choice == "8":
             manager.test()
