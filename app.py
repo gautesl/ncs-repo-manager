@@ -49,7 +49,6 @@ def load_user():
 #         github_user = github.get("/user", access_token=oauth_token)
 #     except GitHubError:
 #         flash("Insufficient access.")
-#         next_url = url_for("insufficient_access")
 #         return redirect(next_url)
 
 #     id = github_user["id"]
@@ -63,7 +62,8 @@ def load_user():
 #         manager = RepoManager(oauth_token, id)
 #         users[id]["manager"] = manager
 #     except GithubException:
-#         next_url = url_for("insufficient_access")
+#         flash("Insufficient access")
+#         next_url = url_for("home")
 
 #     return redirect(next_url)
 
@@ -85,7 +85,6 @@ def authorized(oauth_token):
         github_user = github.get("/user", access_token=oauth_token)
     except GitHubError:
         flash("Insufficient access.")
-        next_url = url_for("insufficient_access")
         return redirect(next_url)
 
     id = github_user["id"]
@@ -100,7 +99,8 @@ def authorized(oauth_token):
         manager = RepoManager(oauth_token, id)
         users[id]["manager"] = manager
     except GithubException:
-        next_url = url_for("insufficient_access")
+        flash("Insufficient access")
+        next_url = url_for("home")
 
     return redirect(next_url)
 
@@ -115,11 +115,6 @@ def token_getter():
 @app.route("/")
 def home():
     return render_template("home.html", logged_in=g.logged_in, repos=REPOSITORIES)
-
-
-@app.route("/insufficient_access/")
-def about():
-    return render_template("insufficient_access.html")
 
 
 @app.route("/check_users/", methods=("GET", "POST"))
