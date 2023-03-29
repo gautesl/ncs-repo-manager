@@ -15,7 +15,9 @@ github = GitHub(app)
 users = {}
 
 # Utilify functions
-def create_table(mapping : Dict[str, Dict[str, Access]]) -> Tuple[List[str], List[List[str]]]:
+def create_table(
+    mapping: Dict[str, Dict[str, Access]]
+) -> Tuple[List[str], List[List[str]]]:
     repos = [repo.split("/")[1] for repo in REPOSITORIES]
     head = [""] + repos
     rows = []
@@ -28,7 +30,9 @@ def create_table(mapping : Dict[str, Dict[str, Access]]) -> Tuple[List[str], Lis
         rows.append(row)
     return head, rows
 
+
 # Flask functions
+
 
 @app.before_request
 def load_user():
@@ -112,8 +116,13 @@ def check_users():
             available = g.user["manager"].get_available_requests()
 
     return render_template(
-        "check_users.html", logged_in=g.logged_in, head=head, rows=rows, available=available
+        "check_users.html",
+        logged_in=g.logged_in,
+        head=head,
+        rows=rows,
+        available=available,
     )
+
 
 @app.route("/add_users/", methods=("GET", "POST"))
 def add_users():
@@ -138,10 +147,11 @@ def add_users():
                 elif success:
                     flash(f"Added user {username}", category="success")
             g.user["manager"].clear_cache()
-            
+
             return redirect(url_for("check_users"))
 
     return render_template("add_users.html", logged_in=g.logged_in, available=available)
+
 
 @app.route("/list_users/", methods=("GET", "POST"))
 def list_users():
@@ -162,5 +172,9 @@ def list_users():
             available = g.user["manager"].get_available_requests()
 
     return render_template(
-        "list_users.html", logged_in=g.logged_in, head=head, rows=rows, available=available
+        "list_users.html",
+        logged_in=g.logged_in,
+        head=head,
+        rows=rows,
+        available=available,
     )

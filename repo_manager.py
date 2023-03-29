@@ -24,6 +24,7 @@ REPOSITORIES = [
 
 LIST_USER_CACHE_THRESHOLD = 3
 
+
 class Access(Enum):
     MEMBER = "✔️"
     OUTSIDE = "✔️🚪"
@@ -70,7 +71,9 @@ class RepoManager:
         self._g = Github(access_token, per_page=100)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
 
-    def _list_user_repo_access(self, user : NamedUser, collaborators : Dict[str, PaginatedList]) -> Dict[str, Access]:
+    def _list_user_repo_access(
+        self, user: NamedUser, collaborators: Dict[str, PaginatedList]
+    ) -> Dict[str, Access]:
         """List access rights for all relevant repositories for a given user.
 
         Args:
@@ -106,11 +109,15 @@ class RepoManager:
 
             if access and user in repo.get_collaborators(affiliation="outside"):
                 repos[repo.name] = Access.OUTSIDE
-            elif not access and user in [invite.invitee for invite in repo.get_pending_invitations()]:
+            elif not access and user in [
+                invite.invitee for invite in repo.get_pending_invitations()
+            ]:
                 repos[repo.name] = Access.PENDING
         return repos
 
-    def list_repo_access(self, username : str, collaborators : Dict[str, PaginatedList] = None) -> Dict[str, Access]:
+    def list_repo_access(
+        self, username: str, collaborators: Dict[str, PaginatedList] = None
+    ) -> Dict[str, Access]:
         """List access rights for all relevant repositories for a given username.
 
         Args:
@@ -132,7 +139,7 @@ class RepoManager:
 
         return self._list_user_repo_access(user, collaborators)
 
-    def list_users(self, usernames : List[str]) -> Dict[str, Dict[str, Access]]:
+    def list_users(self, usernames: List[str]) -> Dict[str, Dict[str, Access]]:
         """List access rights for a list of usernames.
 
         Args:
@@ -161,13 +168,13 @@ class RepoManager:
                 collaborators[repo.name] = repo.get_collaborators()
 
         return {user: self.list_repo_access(user, collaborators) for user in usernames}
-    
-    def add_user(self, username : str) -> Tuple[bool, str]:
+
+    def add_user(self, username: str) -> Tuple[bool, str]:
         """Add a user to all relevant repositories.
 
         Args:
             username: Login of the GitHub user to be added
-        
+
         Returns:
             Tuple of (success, message) where success indicates the user was
             added to at least one repository and message displays any errors
@@ -185,18 +192,21 @@ class RepoManager:
         for repo_name, access in access_list:
             if access == Access.MEMBER:
                 return False, f"User is already an organization member of {repo_name}"
-        
+
         try:
             for repo in self._repos:
                 repo.add_to_collaborators(user, permission="pull")
         except GithubException as e:
             if "message" in e:
                 return True, e["message"]
-            return True, f"Something went wrong while adding to collaborators for {repo.name}"
+            return (
+                True,
+                f"Something went wrong while adding to collaborators for {repo.name}",
+            )
 
         return True, ""
 
-    def add_users(self, usernames : List[str]) -> Dict[str, Tuple[bool, str]]:
+    def add_users(self, usernames: List[str]) -> Dict[str, Tuple[bool, str]]:
         """Add a list of users to the relevant repositories.
 
         Args:
@@ -227,7 +237,9 @@ class RepoManager:
             all_repos[repo.name] = {
                 "all_collaborators": repo.get_collaborators(),
                 "outside_collaborators": repo.get_collaborators(affiliation="outside"),
-                "pending_invites": [inv.invitee for inv in repo.get_pending_invitations()],
+                "pending_invites": [
+                    inv.invitee for inv in repo.get_pending_invitations()
+                ],
             }
             all_outside_collaborators += all_repos[repo.name]["outside_collaborators"]
 
@@ -242,9 +254,9 @@ class RepoManager:
                     access_map[repo_name] = Access.MEMBER
                 elif collaborator in repo_map["pending_invites"]:
                     access_map[repo_name] = Access.PENDING
-        
+
         return collaborator_access_map
-    
+
     def get_available_requests(self) -> int:
         """Get number of remaining core requests that can be made to the GitHub API.
 
@@ -270,7 +282,8 @@ def cli_help():
     print("9: Clear cached results")
     print("exit: Exit the REPL")
 
-def print_repo_access(access_map : Dict[str, Access]):
+
+def print_repo_access(access_map: Dict[str, Access]):
     repos = [repo.split("/")[1] for repo in REPOSITORIES]
     for repo in repos:
         access = access_map[repo]
@@ -282,6 +295,7 @@ def print_repo_access(access_map : Dict[str, Access]):
         elif access == Access.MEMBER:
             prefix = "Org access"
         print(f"{prefix : <16}\t{repo} {access}")
+
 
 # Main REPL command loop
 def main(access_token):
@@ -339,7 +353,11 @@ def main(access_token):
                 print(f"Error:\n{message}")
 
         elif choice == "5":
-            users = input("Space separated list of login names of users to add: \n> ").strip().split()
+            users = (
+                input("Space separated list of login names of users to add: \n> ")
+                .strip()
+                .split()
+            )
             if not users:
                 continue
             for name, (success, message) in manager.add_users(users).items():
