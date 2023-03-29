@@ -17,4 +17,7 @@
     {% else %}
         <p>You must <a href="{{ url_for('login') }}">login</a> to view this page.</p>
     {% endif %}
+    {% if available >= 0 %}
+        Remaining API calls available: {{ available }}
+    {% endif %}
 {% endblock %}

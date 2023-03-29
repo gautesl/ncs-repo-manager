@@ -164,6 +164,9 @@ class RepoManager:
                     access_map[repo_name] = Access.PENDING
         
         return collaborator_access_map
+    
+    def get_available_requests(self) -> int:
+        return self._g.get_rate_limit().core.remaining
 
     def clear_cache(self):
         requests_cache.clear()
@@ -177,6 +180,7 @@ def cli_help():
     print("1: List repository access for a user")
     print("2: List repository access for a list of users")
     print("3: List repository access for all outside collaborators")
+    print("4: Get available requests")
     print("8: Test")
     print("9: Clear cached results")
     print("exit: Exit the REPL")
@@ -235,6 +239,10 @@ def main(access_token):
             for user in lst:
                 print("\n" + user)
                 print_repo_access(lst[user])
+
+        elif choice == "4":
+            available = manager.get_available_requests()
+            print(f"You have {available} available requests")
 
         elif choice == "8":
             manager.test()

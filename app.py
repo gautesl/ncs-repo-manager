@@ -99,7 +99,6 @@ def authorized(oauth_token):
     try:
         manager = RepoManager(oauth_token, id)
         users[id]["manager"] = manager
-        print("Created an associated repo manager")
     except GithubException:
         next_url = url_for("insufficient_access")
 
@@ -127,6 +126,10 @@ def about():
 def check_users():
     head = None
     rows = None
+    available = -1
+
+    if g.logged_in:
+        available = g.user["manager"].get_available_requests()
 
     if request.method == "POST":
         usernames = request.form["usernames"]
@@ -138,13 +141,19 @@ def check_users():
             g.user["manager"].clear_cache()
             res = g.user["manager"].list_users(usernames.split())
             head, rows = create_table(res)
+            available = g.user["manager"].get_available_requests()
 
     return render_template(
-        "check_users.html", logged_in=g.logged_in, head=head, rows=rows
+        "check_users.html", logged_in=g.logged_in, head=head, rows=rows, available=available
     )
 
 @app.route("/add_users/", methods=("GET", "POST"))
 def add_users():
+    available = -1
+
+    if g.logged_in:
+        available = g.user["manager"].get_available_requests()
+
     if request.method == "POST":
         usernames = request.form["usernames"]
         if not usernames:
@@ -164,15 +173,17 @@ def add_users():
             
             return redirect(url_for("check_users"))
 
-    return render_template("add_users.html", logged_in=g.logged_in)
+    return render_template("add_users.html", logged_in=g.logged_in, available=available)
 
 @app.route("/list_users/", methods=("GET", "POST"))
 def list_users():
     head = None
     rows = None
+    available = -1
 
-    print("Request for 'list_users':")
-    print("\tlogged in:", g.logged_in)
+    if g.logged_in:
+        available = g.user["manager"].get_available_requests()
+
     if request.method == "POST":
         if not g.logged_in:
             flash("You must be logged in to use this functionality")
@@ -180,7 +191,8 @@ def list_users():
             g.user["manager"].clear_cache()
             res = g.user["manager"].list_outside_collaborators()
             head, rows = create_table(res)
+            available = g.user["manager"].get_available_requests()
 
     return render_template(
-        "list_users.html", logged_in=g.logged_in, head=head, rows=rows
+        "list_users.html", logged_in=g.logged_in, head=head, rows=rows, available=available
     )
