@@ -1,7 +1,7 @@
 from github import Github, GithubException
 from github.NamedUser import NamedUser
 from github.PaginatedList import PaginatedList
-from typing import Tuple, List, Dict, Union
+from typing import Tuple, List, Dict
 from enum import Enum
 import requests_cache
 import argparse
@@ -37,6 +37,11 @@ class Access(Enum):
 class RepoManager:
     """Repository access manager for onboarding.
 
+    Helps with listing user access and adding users to repositories.
+
+    This class uses the `requests_cache` library to cache request results.
+    To get updated results, be sure to use the `clear_cache()` class method.
+
     The following repositories are used:
     - https://github.com/nrfconnect/sdk-nrf-next
     - https://github.com/nrfconnect/sdk-ic-next
@@ -52,14 +57,39 @@ class RepoManager:
     """
 
     def __init__(self, access_token, id="common"):
+        """Create a new AccessManager for an authenticated Github user.
+
+        Args:
+            access_token: A valid Oauth token to perform API calls with.
+            id: Unique value that determines the sqlite cache name.
+
+        API calls: One for each repository (11)
+        """
         requests_cache.install_cache(f"github_cache_{id}")
 
         self._g = Github(access_token, per_page=100)
         self._repos = [self._g.get_repo(repo) for repo in REPOSITORIES]
 
     def _list_user_repo_access(self, user : NamedUser, collaborators : Dict[str, PaginatedList]) -> Dict[str, Access]:
-        """
-        API calls: 2 * repos + pagination
+        """List access rights for all relevant repositories for a given user.
+
+        Args:
+            user: A GitHub user object representing the user in question.
+            collaborators: Mapping repos to all their collaborators (optional).
+                           Used to bypass the has_in_collaborators API call.
+
+        API calls:
+            if collaborators != {}:
+                2 * repos * pagination
+            else:
+                repos
+
+        Notes:
+        - Pagination is requests per page (100) / number of
+          collaborators for a given repository and request.
+        - As all requests are cached, get_collaborators and get_pending_invites
+          can use the cached results in subsequent calls. If the collaborators
+          parameter is set, no API calls are made.
         """
 
         repos = {}
@@ -81,8 +111,18 @@ class RepoManager:
         return repos
 
     def list_repo_access(self, username : str, collaborators : Dict[str, PaginatedList] = None) -> Dict[str, Access]:
-        """
-        API calls: 2 * repos + pagination
+        """List access rights for all relevant repositories for a given username.
+
+        Args:
+            username: login for the requested user.
+            collaborators: Mapping repos to all their collaborators (optional).
+                           Used to bypass the has_in_collaborators API call.
+
+        Returns:
+            A mapping from each relevant repository to the users access level
+            to that repo. Returns None if the given user is not found.
+
+        API calls: Same as _list_user_repo_access + 1 for get_user()
         """
 
         try:
@@ -93,8 +133,26 @@ class RepoManager:
         return self._list_user_repo_access(user, collaborators)
 
     def list_users(self, usernames : List[str]) -> Dict[str, Dict[str, Access]]:
-        """
-        API calls: (2 * repos + pagination) * users
+        """List access rights for a list of usernames.
+
+        Args:
+            usernames: List of user logins
+
+        Returns:
+            Mapping of each username to their mapping of repos to access levels.
+            If a user is not found, they are mapped to None.
+
+        API calls:
+            if len(usernames) >= LIST_USER_CACHE_THRESHOLD (3):
+                repos * 3 + pagination + users
+            else:
+                repos * 2 + (users * 2)
+
+        Note:
+        Assuming get_pending_invites and get_collaborators(affiliation="outside")
+        all has less than 100 results per repo, only get_collaborators() will
+        cause pagination. Assuming an average of three pages per repo for
+        get_collaborators(), the pagination equals to repos * 3.
         """
 
         collaborators = {}
@@ -105,8 +163,17 @@ class RepoManager:
         return {user: self.list_repo_access(user, collaborators) for user in usernames}
     
     def add_user(self, username : str) -> Tuple[bool, str]:
-        """
-        API calls: (2 * repos + pagination) + repos
+        """Add a user to all relevant repositories.
+
+        Args:
+            username: Login of the GitHub user to be added
+        
+        Returns:
+            Tuple of (success, message) where success indicates the user was
+            added to at least one repository and message displays any errors
+            that occurred.
+
+        API calls: _list_user_repo_access + 2
         """
 
         try:
@@ -129,16 +196,30 @@ class RepoManager:
 
         return True, ""
 
-    def add_users(self, usernames : str) -> Dict[str, Tuple[bool, str]]:
-        """
-        API calls: ((2 * repos + pagination) + repos) * users
+    def add_users(self, usernames : List[str]) -> Dict[str, Tuple[bool, str]]:
+        """Add a list of users to the relevant repositories.
+
+        Args:
+            usernames: List of GitHub user Logins to be added
+
+        Returns:
+            Mapping of each user to a tuple of (success, message) where success
+            indicates the user was added to at least one repository and message
+            displays any errors that occurred.
+
+        API calls:
+            Same as add_user for the first user, then 3 for each subsequent user.
         """
 
         return {username: self.add_user(username) for username in usernames}
 
     def list_outside_collaborators(self) -> Dict[str, Dict[str, Access]]:
-        """
-        API calls: 3 * repo + pagination
+        """List all users that are outside collaborators of at least one repo.
+
+        Returns:
+            Mapping of each username to their mapping of repos to access levels.
+
+        API calls: 3 * repos + pagination
         """
         all_outside_collaborators = []
         all_repos = {}
@@ -149,7 +230,6 @@ class RepoManager:
                 "pending_invites": [inv.invitee for inv in repo.get_pending_invitations()],
             }
             all_outside_collaborators += all_repos[repo.name]["outside_collaborators"]
-
 
         collaborator_access_map = {}
         for collaborator in all_outside_collaborators:
@@ -166,22 +246,27 @@ class RepoManager:
         return collaborator_access_map
     
     def get_available_requests(self) -> int:
+        """Get number of remaining core requests that can be made to the GitHub API.
+
+        Returns:
+            Number of core requests remaining.
+        """
         return self._g.get_rate_limit().core.remaining
 
     def clear_cache(self):
+        """Clear the requests cache."""
         requests_cache.clear()
 
-    def test(self):
-        pass
 
-
+# REPL helper functions
 def cli_help():
     print("\n0: Show this list of commands")
     print("1: List repository access for a user")
     print("2: List repository access for a list of users")
     print("3: List repository access for all outside collaborators")
-    print("4: Get available requests")
-    print("8: Test")
+    print("4: Add a user to all repositories")
+    print("5: Add multiple users to all repositories")
+    print("8: Get available requests")
     print("9: Clear cached results")
     print("exit: Exit the REPL")
 
@@ -198,7 +283,7 @@ def print_repo_access(access_map : Dict[str, Access]):
             prefix = "Org access"
         print(f"{prefix : <16}\t{repo} {access}")
 
-
+# Main REPL command loop
 def main(access_token):
     manager = RepoManager(access_token)
 
@@ -241,11 +326,35 @@ def main(access_token):
                 print_repo_access(lst[user])
 
         elif choice == "4":
-            available = manager.get_available_requests()
-            print(f"You have {available} available requests")
+            name = input("login name of user to add: \n> ").strip()
+            if not name:
+                continue
+            success, message = manager.add_user(name)
+            if success and message:
+                print(f"Could not add {name} to all repositories:")
+                print(message)
+            elif success:
+                print("User successfully added to all repos")
+            else:
+                print(f"Error:\n{message}")
+
+        elif choice == "5":
+            users = input("Space separated list of login names of users to add: \n> ").strip().split()
+            if not users:
+                continue
+            for name, (success, message) in manager.add_users(users).items():
+                if success and message:
+                    print(f"Could not add {name} to all repositories:")
+                    print(message)
+                elif success:
+                    print("User successfully added to all repos")
+                else:
+                    print(f"Error:\n{message}")
 
         elif choice == "8":
-            manager.test()
+            available = manager.get_available_requests()
+            print(f"You have {available} available requests.")
+            print("Note: You need to clear the cache to get updated results.")
 
         elif choice == "9":
             manager.clear_cache()
